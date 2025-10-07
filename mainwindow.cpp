@@ -308,7 +308,7 @@ void MainWindow::createContent()
     contentLayout->setSpacing(20);
 
     // Header
-    auto *headerLabel = new QLabel("BẢNG 10x10 VỚI BÓNG NẢY (THREAD)", rightContent);
+    auto *headerLabel = new QLabel("Line98 xếp banh", rightContent);
     headerLabel->setStyleSheet(
         "font-size: 28px;"
         "font-weight: bold;"
@@ -321,7 +321,7 @@ void MainWindow::createContent()
     headerLabel->setAlignment(Qt::AlignCenter);
 
     // Info label
-    auto *infoLabel = new QLabel("Click vào trái banh để làm nó nảy lên xuống (mỗi bóng chạy trên thread riêng)!", rightContent);
+    auto *infoLabel = new QLabel("Ghép 5 quả bóng cùng màu thành hàng ngang, dọc hoặc chéo để ghi điểm.)!", rightContent);
     infoLabel->setStyleSheet(
         "font-size: 14px;"
         "color: #7f8c8d;"
