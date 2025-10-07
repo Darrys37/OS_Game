@@ -28,8 +28,13 @@ void BallThread::startBouncing()
 
 void BallThread::stopBouncing()
 {
-    m_bouncing.store(false);
+    QMutexLocker locker(&m_mutex);
+    m_bouncing.store(false);      // dừng nảy
+    m_offset = 0;                 // 🔹 đưa banh về giữa ô
+    emit bounceUpdated(m_ballId, m_offset); // 🔹 cập nhật lại hiển thị ngay
 }
+
+
 
 void BallThread::stopAndWait()
 {

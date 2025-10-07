@@ -132,25 +132,28 @@ void MainWindow::startMoveAlongPath(const QVector<QPoint> &path, int ballIndex)
 
 void MainWindow::stopMovement()
 {
-    if (moveTimer && moveTimer->isActive()) moveTimer->stop();
-
+    if (moveTimer && moveTimer->isActive()) {
+        moveTimer->stop();
+    }
     currentPath.clear();
     currentPathStep = 0;
 
-    // restart bounce on the ball that finished moving
+    // Khi di chuyển xong: chỉ cho 1 quả nảy — quả đang được chọn
     if (movingBallIndex >= 0 && movingBallIndex < balls.size()) {
-        Ball &b = balls[movingBallIndex];
-        if (b.thread) b.thread->startBouncing();
+        for (int i = 0; i < balls.size(); ++i) {
+            if (i == movingBallIndex) {
+                if (balls[i].thread) balls[i].thread->startBouncing();
+                selectedBallIndex = i; // chọn lại quả đang di chuyển
+            } else {
+                if (balls[i].thread) balls[i].thread->stopBouncing();
+            }
+        }
     }
 
     movingBallIndex = -1;
-
-    // After movement finished we want the user to click again to re-select,
-    // so clear selectedBallIndex.
-    selectedBallIndex = -1;
-
     updateBallPositions();
 }
+
 
 
 
