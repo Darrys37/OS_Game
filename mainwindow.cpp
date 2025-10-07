@@ -585,40 +585,50 @@ void MainWindow::updateBallPositions()
 
 void MainWindow::onRandomizeClicked()
 {
-    // stop any movement / selection
-    stopMovement();
     stopAllThreads();
 
-    // randomize positions/colors
+    QVector<QColor> usedColors; // lưu màu đã chọn để tránh trùng
+
     for (Ball &ball : balls) {
         bool positionExists;
         do {
             positionExists = false;
             ball.row = getRandomInt(0, 9);
             ball.col = getRandomInt(0, 9);
-            for (const Ball &other : balls) {
-                if (&ball != &other && ball.row == other.row && ball.col == other.col) {
-                    positionExists = true; break;
+
+            for (const Ball &otherBall : balls) {
+                if (&ball != &otherBall && ball.row == otherBall.row && ball.col == otherBall.col) {
+                    positionExists = true;
+                    break;
                 }
             }
         } while (positionExists);
 
-        ball.color = getRandomColor();
+        // Random màu không trùng
+        QColor color;
+        do {
+            color = getRandomColor();
+        } while (usedColors.contains(color));
+
+        usedColors.append(color);
+        ball.color = color;
+
         ball.bounceOffset = 0;
 
-        // make sure thread exists but not started by default
-        if (!ball.thread) {
-            ball.thread = new BallThread(ball.id, this);
-            connect(ball.thread, &BallThread::bounceUpdated, this, &MainWindow::onBounceUpdated);
-        } else {
-            ball.thread->stopBouncing();
-        }
+        // Tạo thread mới (nhưng KHÔNG cho chạy nảy)
+        ball.thread = new BallThread(ball.id, this);
+        connect(ball.thread, &BallThread::bounceUpdated,
+                this, &MainWindow::onBounceUpdated);
     }
 
+    // ❌ không cho banh nào nảy sau khi random
     selectedBallIndex = -1;
     movingBallIndex = -1;
+
     updateBallPositions();
 }
+
+
 
 
 
