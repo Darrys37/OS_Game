@@ -47,6 +47,8 @@ private slots:
     void onBallPositionChanged(int ballIndex, int offsetY);
     void onCellClicked(int row, int column);  // Thêm slot này
     void onBounceUpdated(int ballId, int bounceOffset);  // Thêm slot này
+    void addRandomBalls(int count);
+    void checkAndRemoveLines();
 
 private:
     void setupUi();

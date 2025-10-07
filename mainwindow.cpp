@@ -151,7 +151,10 @@ void MainWindow::stopMovement()
     }
 
     movingBallIndex = -1;
+
     updateBallPositions();
+    addRandomBalls(3);
+    checkAndRemoveLines();
 }
 
 
@@ -762,4 +765,107 @@ void MainWindow::onBallPositionChanged(int ballIndex, int offsetY) {
 bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
     // Nếu bạn chưa xử lý event đặc biệt nào, chỉ cần:
     return QMainWindow::eventFilter(obj, event);
+}
+void MainWindow::addRandomBalls(int count)
+{
+    QVector<QColor> existingColors;
+    for (const Ball &b : balls)
+        if (!existingColors.contains(b.color))
+            existingColors.append(b.color);
+
+    for (int i = 0; i < count; ++i) {
+        // tìm ô trống
+        QVector<QPoint> emptyCells;
+        for (int r = 0; r < 10; ++r) {
+            for (int c = 0; c < 10; ++c) {
+                if (!isBallAt(r, c))
+                    emptyCells.append(QPoint(r, c));
+            }
+        }
+        if (emptyCells.isEmpty()) return;
+
+        QPoint pos = emptyCells[getRandomInt(0, emptyCells.size() - 1)];
+        QColor color = existingColors[getRandomInt(0, existingColors.size() - 1)];
+
+        Ball newBall;
+        newBall.id = nextBallId++;
+        newBall.row = pos.x();
+        newBall.col = pos.y();
+        newBall.color = color;
+        newBall.bounceOffset = 0;
+        newBall.thread = new BallThread(newBall.id, this);
+
+        connect(newBall.thread, &BallThread::bounceUpdated, this, &MainWindow::onBounceUpdated);
+        balls.append(newBall);
+    }
+
+    updateBallPositions();
+}
+void MainWindow::checkAndRemoveLines()
+{
+    const int R = table->rowCount();
+    const int C = table->columnCount();
+    QVector<QPoint> toRemove;
+
+    auto colorAt = [&](int r, int c) -> QColor {
+        for (const Ball &b : balls)
+            if (b.row == r && b.col == c)
+                return b.color;
+        return QColor();
+    };
+
+    auto checkDir = [&](int r, int c, int dr, int dc) {
+        QColor col = colorAt(r, c);
+        if (!col.isValid()) return QVector<QPoint>();
+        QVector<QPoint> line;
+        line.append(QPoint(r, c));
+        int nr = r + dr, nc = c + dc;
+        while (nr >= 0 && nr < R && nc >= 0 && nc < C && colorAt(nr, nc) == col) {
+            line.append(QPoint(nr, nc));
+            nr += dr;
+            nc += dc;
+        }
+        return line;
+    };
+
+    // kiểm tra ngang, dọc, chéo
+    for (int r = 0; r < R; ++r) {
+        for (int c = 0; c < C; ++c) {
+            QVector<QVector<QPoint>> dirs = {
+                checkDir(r, c, 0, 1),
+                checkDir(r, c, 1, 0),
+                checkDir(r, c, 1, 1),
+                checkDir(r, c, 1, -1)
+            };
+            for (auto &line : dirs) {
+                if (line.size() >= 5)
+                    toRemove += line;
+            }
+        }
+    }
+
+    // xóa các quả trùng nhau (nếu có)
+    std::sort(toRemove.begin(), toRemove.end(), [](const QPoint &a, const QPoint &b){
+        if (a.x() == b.x()) return a.y() < b.y();
+        return a.x() < b.x();
+    });
+    toRemove.erase(std::unique(toRemove.begin(), toRemove.end()), toRemove.end());
+
+    // xóa banh trong danh sách chính
+    for (const QPoint &p : toRemove) {
+        for (int i = 0; i < balls.size(); ++i) {
+            if (balls[i].row == p.x() && balls[i].col == p.y()) {
+                if (balls[i].thread) {
+                    balls[i].thread->stopBouncing();
+                    balls[i].thread->wait(100);
+                    delete balls[i].thread;
+                }
+                balls.removeAt(i);
+                break;
+            }
+        }
+    }
+
+    if (!toRemove.isEmpty())
+        updateBallPositions();
 }
