@@ -166,6 +166,7 @@ void MainWindow::stopMovement()
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 {
     nextBallId = 0;  // Khởi tạo trong thân hàm
+    gameSave = new GameSave(this);
     setupUi();
     setWindowTitle("Ball Game - 10x10 Grid");
     resize(1000, 800);
@@ -222,6 +223,48 @@ void MainWindow::createMenu()
         "text-align: center;"
         );
     titleLabel->setAlignment(Qt::AlignCenter);
+
+    // Save button
+    saveGameButton = new QPushButton("💾 Lưu Game", leftMenu);
+    saveGameButton->setStyleSheet(
+        "QPushButton {"
+        "    background: #27ae60;"
+        "    color: white;"
+        "    border: none;"
+        "    padding: 12px;"
+        "    border-radius: 8px;"
+        "    font-size: 14px;"
+        "    font-weight: bold;"
+        "}"
+        "QPushButton:hover {"
+        "    background: #229954;"
+        "}"
+        "QPushButton:pressed {"
+        "    background: #1e8449;"
+        "}"
+        );
+    saveGameButton->setMinimumHeight(45);
+
+    // Load button
+    loadGameButton = new QPushButton("📂 Mở Game", leftMenu);
+    loadGameButton->setStyleSheet(
+        "QPushButton {"
+        "    background: #f39c12;"
+        "    color: white;"
+        "    border: none;"
+        "    padding: 12px;"
+        "    border-radius: 8px;"
+        "    font-size: 14px;"
+        "    font-weight: bold;"
+        "}"
+        "QPushButton:hover {"
+        "    background: #e67e22;"
+        "}"
+        "QPushButton:pressed {"
+        "    background: #d35400;"
+        "}"
+        );
+    loadGameButton->setMinimumHeight(45);
 
     // Randomize button
     randomizeButton = new QPushButton("🎲 Random Balls", leftMenu);
@@ -286,18 +329,23 @@ void MainWindow::createMenu()
         );
     closeButton->setMinimumHeight(45);
 
+    // Add widgets to layout - ĐÚNG THỨ TỰ VÀ KHÔNG TRÙNG LẶP
     menuLayout->addWidget(titleLabel);
     menuLayout->addSpacing(30);
+    menuLayout->addWidget(saveGameButton);
+    menuLayout->addWidget(loadGameButton);
     menuLayout->addWidget(randomizeButton);
     menuLayout->addWidget(restartButton);
     menuLayout->addStretch(1);
     menuLayout->addWidget(closeButton);
 
+    // Connect signals - THÊM KẾT NỐI CHO NÚT MỚI
     connect(closeButton, &QPushButton::clicked, this, &MainWindow::onCloseClicked);
     connect(restartButton, &QPushButton::clicked, this, &MainWindow::onRestartClicked);
     connect(randomizeButton, &QPushButton::clicked, this, &MainWindow::onRandomizeClicked);
+    connect(saveGameButton, &QPushButton::clicked, this, &MainWindow::onSaveGameClicked);
+    connect(loadGameButton, &QPushButton::clicked, this, &MainWindow::onLoadGameClicked);
 }
-
 void MainWindow::createContent()
 {
     rightContent = new QWidget(this);
@@ -868,4 +916,60 @@ void MainWindow::checkAndRemoveLines()
 
     if (!toRemove.isEmpty())
         updateBallPositions();
+}
+// Thêm implementations:
+void MainWindow::onSaveGameClicked()
+{
+    // Chuẩn bị game state
+    GameSave::GameState gameState;
+
+    for (const Ball &ball : balls) {
+        GameSave::BallData ballData(ball.id, ball.row, ball.col, ball.color, ball.bounceOffset);
+        gameState.balls.append(ballData);
+    }
+
+    gameState.nextBallId = nextBallId;
+    gameState.selectedBallIndex = selectedBallIndex;
+    gameState.movingBallIndex = movingBallIndex;
+
+    // Gọi save
+    gameSave->saveGame(gameState, this);
+}
+
+void MainWindow::onLoadGameClicked()
+{
+    GameSave::GameState gameState;
+
+    if (gameSave->loadGame(gameState, this)) {
+        // Stop all current threads
+        stopAllThreads();
+        balls.clear();
+
+        // Load balls from saved state
+        for (const GameSave::BallData &ballData : gameState.balls) {
+            Ball ball;
+            ball.id = ballData.id;
+            ball.row = ballData.row;
+            ball.col = ballData.col;
+            ball.color = ballData.color;
+            ball.bounceOffset = ballData.bounceOffset;
+            ball.thread = new BallThread(ball.id, this);
+            ball.ballLabel = nullptr;
+
+            connect(ball.thread, &BallThread::bounceUpdated, this, &MainWindow::onBounceUpdated);
+            balls.append(ball);
+        }
+
+        // Restore game state
+        nextBallId = gameState.nextBallId;
+        selectedBallIndex = gameState.selectedBallIndex;
+        movingBallIndex = gameState.movingBallIndex;
+
+        // Restart bouncing for selected ball
+        if (selectedBallIndex >= 0 && selectedBallIndex < balls.size()) {
+            balls[selectedBallIndex].thread->startBouncing();
+        }
+
+        updateBallPositions();
+    }
 }

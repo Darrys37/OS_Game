@@ -12,7 +12,7 @@
 #include <QColor>
 #include <QThread>
 #include "ballthread.h"  // Thêm include này
-
+#include "gamesave.h"
 class BallWorker : public QObject {
     Q_OBJECT
 public:
@@ -49,7 +49,8 @@ private slots:
     void onBounceUpdated(int ballId, int bounceOffset);  // Thêm slot này
     void addRandomBalls(int count);
     void checkAndRemoveLines();
-
+    void onSaveGameClicked();
+    void onLoadGameClicked();
 private:
     void setupUi();
     void createMenu();
@@ -75,7 +76,9 @@ private:
     QPushButton *startAnimationButton;
     QPushButton *stopAnimationButton;
     QLabel *titleLabel;
-
+    GameSave *gameSave;
+    QPushButton *saveGameButton;   // Thêm dòng này
+    QPushButton *loadGameButton;   // Thêm dòng này
     // Ball data
     struct Ball {
         int id;  // Thêm id
