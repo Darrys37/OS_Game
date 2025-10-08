@@ -64,6 +64,7 @@ private:
     QColor getRandomColor();
     int getRandomInt(int min, int max);
     bool eventFilter(QObject *obj, QEvent *event) override;
+    QVector<QColor> baseColors; // <<< THÊM DÒNG NÀY
 
     // UI Components
     QWidget *centralWidget;

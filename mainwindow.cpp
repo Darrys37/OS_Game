@@ -93,6 +93,7 @@ QVector<QPoint> MainWindow::findPath(int sr, int sc, int tr, int tc)
     path.prepend(QPoint(sr,sc));
     return path;
 }
+
 void MainWindow::startMoveAlongPath(const QVector<QPoint> &path, int ballIndex)
 {
     if (path.isEmpty() || ballIndex < 0 || ballIndex >= balls.size()) return;
@@ -157,21 +158,21 @@ void MainWindow::stopMovement()
     checkAndRemoveLines();
 }
 
-
-
-
-
 // Sửa constructor
-
+// Sửa constructor
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 {
-    nextBallId = 0;  // Khởi tạo trong thân hàm
+
+    nextBallId = 0;
     gameSave = new GameSave(this);
     setupUi();
     setWindowTitle("Ball Game - 10x10 Grid");
     resize(1000, 800);
-    // setMinimumSize(900, 900);
 
+    // Khởi tạo các biến animation
+    animationThread = nullptr;
+    ballWorker = nullptr;
+    isAnimating = false;
 
     initializeBalls();
 }
@@ -346,6 +347,7 @@ void MainWindow::createMenu()
     connect(saveGameButton, &QPushButton::clicked, this, &MainWindow::onSaveGameClicked);
     connect(loadGameButton, &QPushButton::clicked, this, &MainWindow::onLoadGameClicked);
 }
+
 void MainWindow::createContent()
 {
     rightContent = new QWidget(this);
@@ -466,57 +468,49 @@ bool MainWindow::isBallAt(int row, int col)
 // -------------------------
 void MainWindow::stopAllThreads()
 {
+    qDebug() << "Dừng tất cả threads, số lượng bóng:" << balls.size();
     for (Ball &ball : balls) {
         if (ball.thread) {
-            ball.thread->stopAndWait();  // ✅ thay vì stopBouncing + wait
+            qDebug() << "Dừng thread cho bóng ID:" << ball.id;
+            ball.thread->stopAndWait();
             disconnect(ball.thread, nullptr, this, nullptr);
             delete ball.thread;
             ball.thread = nullptr;
         }
     }
+    qDebug() << "Đã dừng tất cả threads";
 }
-
-
 
 void MainWindow::initializeBalls()
 {
     stopAllThreads();
     balls.clear();
 
-    // Vị trí cố định ban đầu cho 3 trái banh
-    QVector<QPoint> initialPositions = {
-        QPoint(2, 2),  // Ball 1
-        QPoint(5, 5),  // Ball 2
-        QPoint(8, 8)   // Ball 3
-    };
+    // ====> THÊM VÀO ĐÂY <====
+    // Thiết lập bộ màu gốc mặc định khi bắt đầu game mới
+    baseColors.clear();
+    baseColors << QColor(255, 0, 0)   // Red
+               << QColor(0, 255, 0)   // Green
+               << QColor(0, 0, 255);  // Blue
+    // ====> KẾT THÚC <====
 
-    QVector<QColor> initialColors = {
-        QColor(255, 0, 0),   // Red
-        QColor(0, 255, 0),   // Green
-        QColor(0, 0, 255)    // Blue
-    };
+    QVector<QPoint> initialPositions = { QPoint(2, 2), QPoint(5, 5), QPoint(8, 8) };
 
     for (int i = 0; i < 3; ++i) {
         Ball ball;
         ball.id = nextBallId++;
         ball.row = initialPositions[i].x();
         ball.col = initialPositions[i].y();
-        ball.color = initialColors[i];
+        ball.color = baseColors[i]; // Lấy màu từ baseColors vừa thiết lập
+        // ... (phần còn lại giữ nguyên)
         ball.bounceOffset = 0;
         ball.thread = new BallThread(ball.id, this);
-
-        connect(ball.thread, &BallThread::bounceUpdated,
-                this, &MainWindow::onBounceUpdated);
-
+        connect(ball.thread, &BallThread::bounceUpdated, this, &MainWindow::onBounceUpdated);
         balls.append(ball);
     }
 
     updateBallPositions();
-}
-
-
-
-QColor MainWindow::getRandomColor()
+}QColor MainWindow::getRandomColor()
 {
     static const QVector<QColor> colors = {
         QColor(255, 0, 0),     // Red
@@ -627,26 +621,30 @@ void MainWindow::updateBallPositions()
     }
 }
 
-
-// -------------------------
-// onCellClicked an toàn (kiểm tra tồn tại ball + không truy cập thread null)
-// -------------------------
-
-
-
 void MainWindow::onRandomizeClicked()
 {
-    stopAllThreads();
+    // Dừng và đợi tất cả thread hiện tại
+    for (Ball &ball : balls) {
+        if (ball.thread) {
+            ball.thread->stopBouncing();
+            ball.thread->wait(100);
+        }
+    }
 
-    QVector<QColor> usedColors; // lưu màu đã chọn để tránh trùng
+    QVector<QColor> usedColors;
+
+    // ====> BẮT ĐẦU THAY ĐỔI <====
+    // Xóa danh sách màu gốc hiện tại để chuẩn bị cập nhật mới
+    baseColors.clear();
+    // ====> KẾT THÚC THAY ĐỔI <====
 
     for (Ball &ball : balls) {
+        // (Giữ nguyên logic tìm vị trí mới...)
         bool positionExists;
         do {
             positionExists = false;
             ball.row = getRandomInt(0, 9);
             ball.col = getRandomInt(0, 9);
-
             for (const Ball &otherBall : balls) {
                 if (&ball != &otherBall && ball.row == otherBall.row && ball.col == otherBall.col) {
                     positionExists = true;
@@ -655,7 +653,7 @@ void MainWindow::onRandomizeClicked()
             }
         } while (positionExists);
 
-        // Random màu không trùng
+        // (Giữ nguyên logic random màu không trùng từ danh sách lớn...)
         QColor color;
         do {
             color = getRandomColor();
@@ -664,26 +662,26 @@ void MainWindow::onRandomizeClicked()
         usedColors.append(color);
         ball.color = color;
 
+        // ====> BẮT ĐẦU THAY ĐỔI <====
+        // Thêm màu vừa được chọn vào danh sách baseColors mới của game
+        baseColors.append(color);
+        // ====> KẾT THÚC THAY ĐỔI <====
+
         ball.bounceOffset = 0;
 
-        // Tạo thread mới (nhưng KHÔNG cho chạy nảy)
-        ball.thread = new BallThread(ball.id, this);
-        connect(ball.thread, &BallThread::bounceUpdated,
-                this, &MainWindow::onBounceUpdated);
+        // (Giữ nguyên logic còn lại...)
+        if (ball.thread) {
+            ball.thread->stopBouncing();
+        } else {
+            ball.thread = new BallThread(ball.id, this);
+            connect(ball.thread, &BallThread::bounceUpdated, this, &MainWindow::onBounceUpdated);
+        }
     }
 
-    // ❌ không cho banh nào nảy sau khi random
     selectedBallIndex = -1;
     movingBallIndex = -1;
-
     updateBallPositions();
 }
-
-
-
-
-
-
 void MainWindow::onCellClicked(int row, int column)
 {
     qDebug() << "Cell clicked:" << row << column;
@@ -749,9 +747,6 @@ void MainWindow::onCellClicked(int row, int column)
     startMoveAlongPath(path, selectedBallIndex);
 }
 
-
-
-
 void MainWindow::onBounceUpdated(int ballId, int bounceOffset)
 {
     for (Ball &ball : balls) {
@@ -773,6 +768,7 @@ void MainWindow::onRestartClicked()
 {
     initializeBalls();
 }
+
 BallWorker::BallWorker() : running(false), direction(1) {}
 
 void BallWorker::process() {
@@ -814,15 +810,10 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
     // Nếu bạn chưa xử lý event đặc biệt nào, chỉ cần:
     return QMainWindow::eventFilter(obj, event);
 }
+
 void MainWindow::addRandomBalls(int count)
 {
-    QVector<QColor> existingColors;
-    for (const Ball &b : balls)
-        if (!existingColors.contains(b.color))
-            existingColors.append(b.color);
-
     for (int i = 0; i < count; ++i) {
-        // tìm ô trống
         QVector<QPoint> emptyCells;
         for (int r = 0; r < 10; ++r) {
             for (int c = 0; c < 10; ++c) {
@@ -833,9 +824,13 @@ void MainWindow::addRandomBalls(int count)
         if (emptyCells.isEmpty()) return;
 
         QPoint pos = emptyCells[getRandomInt(0, emptyCells.size() - 1)];
-        QColor color = existingColors[getRandomInt(0, existingColors.size() - 1)];
+
+        // ====> LOGIC ĐÚNG KHI THÊM BÓNG MỚI <====
+        // Lấy màu ngẫu nhiên từ danh sách 3 MÀU GỐC
+        QColor color = baseColors[getRandomInt(0, baseColors.size() - 1)];
 
         Ball newBall;
+        // ... (phần còn lại của hàm giữ nguyên)
         newBall.id = nextBallId++;
         newBall.row = pos.x();
         newBall.col = pos.y();
@@ -846,7 +841,6 @@ void MainWindow::addRandomBalls(int count)
         connect(newBall.thread, &BallThread::bounceUpdated, this, &MainWindow::onBounceUpdated);
         balls.append(newBall);
     }
-
     updateBallPositions();
 }
 void MainWindow::checkAndRemoveLines()
@@ -880,14 +874,16 @@ void MainWindow::checkAndRemoveLines()
     for (int r = 0; r < R; ++r) {
         for (int c = 0; c < C; ++c) {
             QVector<QVector<QPoint>> dirs = {
-                checkDir(r, c, 0, 1),
-                checkDir(r, c, 1, 0),
-                checkDir(r, c, 1, 1),
-                checkDir(r, c, 1, -1)
+                checkDir(r, c, 0, 1),   // ngang
+                checkDir(r, c, 1, 0),   // dọc
+                checkDir(r, c, 1, 1),   // chéo phải
+                checkDir(r, c, 1, -1)   // chéo trái
             };
             for (auto &line : dirs) {
-                if (line.size() >= 5)
+                if (line.size() >= 5) {
                     toRemove += line;
+                    qDebug() << "Tìm thấy line dài" << line.size() << "tại (" << r << "," << c << ")";
+                }
             }
         }
     }
@@ -899,24 +895,39 @@ void MainWindow::checkAndRemoveLines()
     });
     toRemove.erase(std::unique(toRemove.begin(), toRemove.end()), toRemove.end());
 
-    // xóa banh trong danh sách chính
+    if (toRemove.isEmpty()) {
+        qDebug() << "Không tìm thấy line nào để xóa";
+        return;
+    }
+
+    qDebug() << "Sẽ xóa" << toRemove.size() << "bóng";
+
+    // xóa banh trong danh sách chính - SỬA CÁCH XÓA ĐỂ TRÁNH CRASH
     for (const QPoint &p : toRemove) {
-        for (int i = 0; i < balls.size(); ++i) {
+        for (int i = balls.size() - 1; i >= 0; --i) {  // duyệt ngược để tránh lỗi index
             if (balls[i].row == p.x() && balls[i].col == p.y()) {
+                qDebug() << "Xóa bóng ID:" << balls[i].id << "tại (" << p.x() << "," << p.y() << ")";
                 if (balls[i].thread) {
                     balls[i].thread->stopBouncing();
                     balls[i].thread->wait(100);
                     delete balls[i].thread;
+                    balls[i].thread = nullptr;
                 }
                 balls.removeAt(i);
-                break;
+                break;  // chỉ xóa 1 bóng tại vị trí này
             }
         }
     }
 
-    if (!toRemove.isEmpty())
-        updateBallPositions();
+    // Cập nhật selectedBallIndex nếu bóng được chọn bị xóa
+    if (selectedBallIndex >= balls.size()) {
+        selectedBallIndex = -1;
+    }
+
+    updateBallPositions();
+    qDebug() << "Còn lại" << balls.size() << "bóng sau khi xóa line";
 }
+
 // Thêm implementations:
 void MainWindow::onSaveGameClicked()
 {
