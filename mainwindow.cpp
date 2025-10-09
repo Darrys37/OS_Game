@@ -224,7 +224,19 @@ void MainWindow::createMenu()
         "text-align: center;"
         );
     titleLabel->setAlignment(Qt::AlignCenter);
-
+    // ====> THÊM ĐOẠN CODE NÀY <====
+    scoreLabel = new QLabel("Điểm: 0", leftMenu);
+    scoreLabel->setStyleSheet(
+        "font-size: 20px;"
+        "font-weight: bold;"
+        "color: #f1c40f;" // Màu vàng cho nổi bật
+        "padding: 10px;"
+        "background: rgba(0,0,0,0.2);"
+        "border-radius: 10px;"
+        "text-align: center;"
+        );
+    scoreLabel->setAlignment(Qt::AlignCenter);
+    // ====> KẾT THÚC <====
     // Save button
     saveGameButton = new QPushButton("💾 Lưu Game", leftMenu);
     saveGameButton->setStyleSheet(
@@ -332,6 +344,8 @@ void MainWindow::createMenu()
 
     // Add widgets to layout - ĐÚNG THỨ TỰ VÀ KHÔNG TRÙNG LẶP
     menuLayout->addWidget(titleLabel);
+    menuLayout->addWidget(scoreLabel); // <<< Thêm scoreLabel vào layout
+    // menuLayout->addSpacing(20);
     menuLayout->addSpacing(30);
     menuLayout->addWidget(saveGameButton);
     menuLayout->addWidget(loadGameButton);
@@ -485,7 +499,8 @@ void MainWindow::initializeBalls()
 {
     stopAllThreads();
     balls.clear();
-
+    currentScore = 0;      // <<< Reset điểm
+    updateScoreDisplay();
     // ====> THÊM VÀO ĐÂY <====
     // Thiết lập bộ màu gốc mặc định khi bắt đầu game mới
     baseColors.clear();
@@ -848,7 +863,7 @@ void MainWindow::checkAndRemoveLines()
     const int R = table->rowCount();
     const int C = table->columnCount();
     QVector<QPoint> toRemove;
-
+    bool lineFound = false;
     auto colorAt = [&](int r, int c) -> QColor {
         for (const Ball &b : balls)
             if (b.row == r && b.col == c)
@@ -881,13 +896,19 @@ void MainWindow::checkAndRemoveLines()
             };
             for (auto &line : dirs) {
                 if (line.size() >= 5) {
+                    // ====> BẮT ĐẦU TÍNH ĐIỂM <====
+                    int points = 50 + (line.size() - 5) * 15;
+                    currentScore += points;
+                    qDebug() << "Tìm thấy" << line.size() << "bóng, cộng" << points << "điểm. Tổng điểm:" << currentScore;
+                    // ====> KẾT THÚC TÍNH ĐIỂM <====
                     toRemove += line;
                     qDebug() << "Tìm thấy line dài" << line.size() << "tại (" << r << "," << c << ")";
                 }
             }
         }
     }
-
+    // Cập nhật điểm số trên giao diện
+    updateScoreDisplay();
     // xóa các quả trùng nhau (nếu có)
     std::sort(toRemove.begin(), toRemove.end(), [](const QPoint &a, const QPoint &b){
         if (a.x() == b.x()) return a.y() < b.y();
@@ -942,6 +963,7 @@ void MainWindow::onSaveGameClicked()
     gameState.nextBallId = nextBallId;
     gameState.selectedBallIndex = selectedBallIndex;
     gameState.movingBallIndex = movingBallIndex;
+    gameState.score = currentScore; // <<< THÊM DÒNG NÀY
 
     // Gọi save
     gameSave->saveGame(gameState, this);
@@ -975,6 +997,7 @@ void MainWindow::onLoadGameClicked()
         nextBallId = gameState.nextBallId;
         selectedBallIndex = gameState.selectedBallIndex;
         movingBallIndex = gameState.movingBallIndex;
+        currentScore = gameState.score; // <<< THÊM DÒNG NÀY
 
         // Restart bouncing for selected ball
         if (selectedBallIndex >= 0 && selectedBallIndex < balls.size()) {
@@ -982,5 +1005,11 @@ void MainWindow::onLoadGameClicked()
         }
 
         updateBallPositions();
+        updateScoreDisplay(); // <<< THÊM DÒNG NÀY ĐỂ HIỂN THỊ ĐIỂM VỪA TẢI
+
     }
+}
+void MainWindow::updateScoreDisplay()
+{
+    scoreLabel->setText(QString("Điểm: %1").arg(currentScore));
 }

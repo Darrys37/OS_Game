@@ -43,6 +43,7 @@ bool GameSave::saveGame(const GameState &gameState, QWidget *parent)
     gameStateObj["nextBallId"] = gameState.nextBallId;
     gameStateObj["selectedBallIndex"] = gameState.selectedBallIndex;
     gameStateObj["movingBallIndex"] = gameState.movingBallIndex;
+    gameStateObj["score"] = gameState.score; // <<< THÊM DÒNG NÀY
 
     // Save timestamp and version for compatibility
     gameStateObj["saveVersion"] = "1.0";
@@ -132,6 +133,7 @@ bool GameSave::loadGame(GameState &gameState, QWidget *parent)
     gameState.nextBallId = gameStateObj.value("nextBallId").toInt(0);
     gameState.selectedBallIndex = gameStateObj.value("selectedBallIndex").toInt(-1);
     gameState.movingBallIndex = gameStateObj.value("movingBallIndex").toInt(-1);
+    gameState.score = gameStateObj.value("score").toInt(0); // <<< THÊM DÒNG NÀY
 
     // Validate loaded data
     if (gameState.balls.isEmpty()) {

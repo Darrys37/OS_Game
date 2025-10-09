@@ -38,7 +38,7 @@ public:
         int nextBallId;
         int selectedBallIndex;
         int movingBallIndex;
-
+        int score; // <<< THÊM DÒNG NÀY
         GameState() : nextBallId(0), selectedBallIndex(-1), movingBallIndex(-1) {}
     };
 

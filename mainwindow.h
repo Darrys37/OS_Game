@@ -57,6 +57,7 @@ private:
     void createContent();
     void initializeBalls();
     void updateBallPositions();
+    void updateScoreDisplay(); // <<< THÊM HÀM NÀY
     void startBallAnimation();
     void stopBallAnimation();
     void stopAllThreads();  // Thêm hàm này
@@ -77,6 +78,7 @@ private:
     QPushButton *startAnimationButton;
     QPushButton *stopAnimationButton;
     QLabel *titleLabel;
+    QLabel *scoreLabel;
     GameSave *gameSave;
     QPushButton *saveGameButton;   // Thêm dòng này
     QPushButton *loadGameButton;   // Thêm dòng này
@@ -93,7 +95,7 @@ private:
 
     QVector<Ball> balls;
     int nextBallId;  // Thêm biến này
-
+    int currentScore;
     // Animation
     QThread *animationThread;
     BallWorker *ballWorker;
